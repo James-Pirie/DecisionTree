@@ -64,68 +64,121 @@ def find_split(data_input: pd.DataFrame):
                                         "information_gain": information_gain(current_table, value)}
             information_gains.append(current_information_gain)
 
-    # return the largest information gain
-    return [max(information_gains, key=lambda x: x['information_gain'])]
+    # return the largest 3 information gains
+    top_3_gains = sorted(information_gains, key=lambda x: x['information_gain'], reverse=True)
+    return top_3_gains[:3]
 
 
-def split_data(data_input: pd.DataFrame, largest_information_gain: dict):
+def split_data(data_input: pd.DataFrame, features_to_split: list):
     """Split a DataFrame into two based upon an information gain score"""
-    split_with_value = data_input[data_input[largest_information_gain['feature']] == largest_information_gain['value']]
-    split_without_value = data_input[data_input[largest_information_gain['feature']] != largest_information_gain['value']]
-    return split_with_value, split_without_value
+    split_frames = []
+    features_values = []
+    for feature in features_to_split:
+        features_values.append(feature['value'])
+        split_with_value = data_input[data_input[feature['feature']] == feature['value']]
+        split_frames.append(split_with_value)
+
+        if len(features_to_split) == 1:
+            split_without_value = data_input[data_input[feature['feature']] != feature['value']]
+            split_frames.append(split_without_value)
+
+    if len(features_to_split) > 1:
+        masks = [data_input[feature['feature']] != value for feature, value in zip(features_to_split, features_values)]
+
+        # Combine masks using logical AND operation
+        combined_mask = masks[0]
+        for mask in masks[1:]:
+            combined_mask &= mask
+        split_frames.append(data_input[combined_mask])
+
+    return split_frames
 
 
-def greed_recursive_splitting(data_input: pd.DataFrame, max_depth: int, current_depth, splitting_point: dict):
+def greedy_recursive_splitting(data_input: pd.DataFrame, max_depth: int, current_depth, splitting_points: list):
     """Recursively split the DataFrame until either entropy is zero or depth limit has been reached """
     tab = "    "
-    print(f"{current_depth * tab}if mushroom['{splitting_point['feature']}'] == '{splitting_point['value']}':")
 
+    # create root node
+    print(f"{current_depth * tab}if mushroom['{splitting_points[0]['feature']}'] == '{splitting_points[0]['value']}':")
     current_depth += 1
 
+    # if not exceeding maximum depth, and there is entropy
+    if current_depth <= max_depth and entropy(data_input) != 0:
+
+        split_frames = split_data(data_input, splitting_points)
+        for frame in split_frames:
+            potential_split_points = find_split(frame)
+            # if not leaf node create children
+            if len(potential_split_points) > 0:
+                primary_split = potential_split_points[0]
+
+                for split in potential_split_points[:1]:
+                    print(split)
+                    if split['feature'] == primary_split['feature'] and split['value'] != primary_split['value']:
+                        greedy_recursive_splitting(frame, max_depth, current_depth, potential_split_points)
+
+    else:
+        print(f"{current_depth * tab}return 'p'")
+
+    """
     if current_depth <= max_depth and entropy(data_input) != 0:
         split_frames = split_data(data_input, splitting_point)
 
-        greed_recursive_splitting(split_frames[0], max_depth, current_depth, find_split(split_frames[0])[0])
-        greed_recursive_splitting(split_frames[1], max_depth, current_depth, find_split(split_frames[1])[0])
+        for frame in split_frames:
+            potential_split_points = find_split(frame)
+
+            if len(potential_split_points) == 0:
+                print(f"{current_depth * tab}return 'p' - end")
+
+            else:
+                initial_point = potential_split_points[0]
+                final_split_points = [initial_point]
+
+                for point in potential_split_points[1:]:
+                    if point['feature'] == initial_point['feature'] and point['value'] != initial_point['value']:
+                        final_split_points.append(point)
+
+                greedy_recursive_splitting(frame, max_depth, current_depth, final_split_points)
 
     else:
-        print(f'{(current_depth + 1) * tab}return "p"')
+        print(f"{current_depth * tab}return 'p'")
+    """
 
 
 def train(data_input: pd.DataFrame, depth: int):
     """Take in a DataFrame and print out the nodes for the decision tree"""
-    splitting_point = find_split(data_input)[0]
-    greed_recursive_splitting(data_input, depth, 0, splitting_point)
+    # find the splitting point for the root node
+    splitting_point = find_split(data_input)
+    greedy_recursive_splitting(data_input, depth, 0, splitting_point)
+
+    # at the end of the tree, return not-poisonous
     print("return 'e'")
 
 
 def decision_tree_implementation(mushroom: pd.DataFrame):
     if mushroom['odor'] == 'f':
         if mushroom['cap-shape'] == 'x':
-            return "p"
-        if mushroom['gill-size'] == 'b':
-            if mushroom['ring-number'] == 'o':
+            return 'p'
+        if mushroom['cap-shape'] == 'x':
+            return 'p'
+        if mushroom['spore-print-color'] == 'r':
+            if mushroom['cap-shape'] == 'f':
+                return 'p'
+            if mushroom['population'] == 'c':
+                if mushroom['cap-shape'] == 'k':
+                    return 'p'
                 if mushroom['cap-shape'] == 'f':
-                    return "p"
-                if mushroom['habitat'] == 'p':
-                    if mushroom['cap-shape'] == 'x':
-                        return "p"
-                    if mushroom['stalk-surface-above-ring'] == 'y':
-                        if mushroom['cap-shape'] == 'b':
-                            return "p"
-                        if mushroom['cap-shape'] == 'b':
-                            return "p"
-            if mushroom['odor'] == 'n':
-                if mushroom['population'] == 'c':
-                    if mushroom['cap-shape'] == 'f':
-                        return "p"
-                    if mushroom['cap-shape'] == 'x':
-                        return "p"
-                if mushroom['stalk-shape'] == 'e':
-                    if mushroom['cap-shape'] == 'x':
-                        return "p"
-                    if mushroom['cap-shape'] == 'f':
-                        return "p"
+                    return 'p'
+        if mushroom['cap-shape'] == 'x':
+            return 'p'
+        if mushroom['gill-size'] == 'b':
+            if mushroom['cap-shape'] == 'f':
+                return 'p'
+            if mushroom['stalk-shape'] == 't':
+                if mushroom['cap-shape'] == 'f':
+                    return 'p'
+                if mushroom['cap-shape'] == 'x':
+                    return 'p'
     return 'e'
 
 
@@ -151,5 +204,5 @@ if __name__ == '__main__':
     training_data = data.iloc[:split_index]
     testing_data = data.iloc[split_index:]
 
-    train(training_data, 100)
+    train(training_data, 5)
     test(testing_data)
