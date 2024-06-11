@@ -4,12 +4,6 @@ import numpy as np
 from baseline_model import decision_tree_implementation
 
 
-import pandas as pd
-import math
-import numpy as np
-from baseline_model import decision_tree_implementation
-
-
 def read_data(filename: str, features: str):
     """Creating a DataFrame from a dictionary"""
     df = pd.read_csv(filename, header=None, names=features)
@@ -87,7 +81,7 @@ def get_majority(data_input: pd.DataFrame):
     return data_input.iloc[:, 0].value_counts().idxmax()
 
 
-def greedy_recursive_splitting(data_input: pd.DataFrame, stopping_depth: int, current_depth: int) -> str:
+def greedy_recursive_splitting(data_input: pd.DataFrame, max_depth: int, current_depth: int) -> str:
     """Recursively split the DataFrame until either entropy is zero or depth limit has been reached """
     tab = "    "
     current_depth += 1
@@ -103,102 +97,22 @@ def greedy_recursive_splitting(data_input: pd.DataFrame, stopping_depth: int, cu
             output += f"{current_depth * tab}if mushroom['{splitting_point['feature']}'] == '{value}':\n"
             split_frames = split_data(data_input, splitting_point)
 
-            if current_depth == stopping_depth or entropy(split_frames[frame_index]) == 0:
+            if current_depth == max_depth or entropy(split_frames[frame_index]) == 0:
                 output += f'{(current_depth + 1) * tab }return "{get_majority(split_frames[frame_index])}"\n'
             else:
                 for frame in split_frames:
-                    if current_depth <= stopping_depth:
-                        output += greedy_recursive_splitting(frame, stopping_depth, current_depth)
+                    if current_depth <= max_depth:
+                        output += greedy_recursive_splitting(frame, max_depth, current_depth)
             frame_index += 1
 
     return output
 
 
-def train(data_input: pd.DataFrame, stopping_depth: int):
+def train(data_input: pd.DataFrame, max_depth: int):
     """Take in a DataFrame and return a string of the code for the nodes for the decision tree"""
     tree_setup = \
-        "import pandas as pd\n\n\ndef decision_tree_implementation(mushroom: pd.DataFrame):\n"
-    return tree_setup + greedy_recursive_splitting(data_input, stopping_depth, 0)
-
-
-def evaluate_model(test_data: pd.DataFrame, decision_tree_implementation):
-    true_positive = 0
-    false_positive = 0
-    true_negative = 0
-    false_negative = 0
-    correct = 0
-
-    for i in range(test_data.shape[0]):
-        if test_data.iloc[i]['poisonous'] == decision_tree_implementation(test_data.iloc[i]):
-            correct += 1
-
-        if test_data.iloc[i]['poisonous'] == 'p' and decision_tree_implementation(test_data.iloc[i]) == 'p':
-            true_positive += 1
-
-        elif test_data.iloc[i]['poisonous'] == 'p' and decision_tree_implementation(test_data.iloc[i]) == 'e':
-            false_negative += 1
-
-        elif test_data.iloc[i]['poisonous'] == 'e' and decision_tree_implementation(test_data.iloc[i]) == 'e':
-            true_negative += 1
-
-        elif test_data.iloc[i]['poisonous'] == 'e' and decision_tree_implementation(test_data.iloc[i]) == 'p':
-            false_positive += 1
-
-    accuracy = (correct / test_data.shape[0]) * 100
-
-    if true_positive + false_positive != 0:
-        precision = (true_positive / (true_positive + false_positive))
-        precision = round(precision, 2)
-    else:
-        precision = 'undefined'
-
-    if true_positive + false_negative != 0:
-        recall = (true_positive / (true_positive + false_negative))
-        recall = round(recall, 2)
-    else:
-        recall = 'undefined'
-
-    try:
-        f_score = 2 * ((precision * recall) / (precision + recall))
-        f_score = round(f_score, 2)
-    except:
-        f_score = 'undefined'
-
-    accuracy = round(accuracy, 2)
-    return f"Test Accuracy: {accuracy}%, Precision: {precision}, Recall: {recall}, F-Score: {f_score}"
-
-
-def test(test_data: pd.DataFrame):
-    # import here, in case tree has just been trained
-    from tree_implementation import decision_tree_implementation
-    return evaluate_model(test_data, decision_tree_implementation)
-
-
-def baseline_test(test_data: pd.DataFrame):
-    return evaluate_model(test_data, decision_tree_implementation)
-
-
-def k_fold_cross_validation(k: int, data_input: pd.DataFrame, depth):
-    """Divide the dataset into k partitions, """
-    k_data_frames = np.array_split(data_input, k)
-
-    for i in range(len(k_data_frames)):
-        # use 1/kth of the data for testing
-        testing_frame = pd.DataFrame(k_data_frames[i])
-        # use the rest of the data for training
-        training_frame = pd.concat([frame for j, frame in enumerate(k_data_frames) if j != i])
-        print(f"======================================= Test {i + 1} =======================================")
-        write_to_file(train(training_frame, depth))
-        print(f"Model Test: {test(testing_frame)}")
-        print(f"Baseline Test: {baseline_test(testing_frame)}")
-
-
-def write_to_file(decision_tree: str):
-    """Write the decision tree to a .py file"""
-    with open('tree_implementation.py', 'w') as file:
-        file.write(decision_tree)
-
-    file.close()
+        "import pandas as pd\n\ndef decision_tree_implementation(mushroom: pd.DataFrame):\n\n"
+    return tree_setup + greedy_recursive_splitting(data_input, max_depth, 0)
 
 
 if __name__ == '__main__':
@@ -211,5 +125,6 @@ if __name__ == '__main__':
 
     data = read_data('mushroom/agaricus-lepiota.data', column_names)
     split_index = int(len(data) * 0.8)
-
-    k_fold_cross_validation(10, data, 1)
+    training_data = data.iloc[:split_index]  # 80% of data for training
+    testing_data = data.iloc[split_index:]  # 20% of data for testing
+    print(train(training_data, 3))

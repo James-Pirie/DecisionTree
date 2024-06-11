@@ -1,2 +1,4 @@
+nltk
+numpy
+imblearn
 pandas
-ucimlrepo
